@@ -34,6 +34,9 @@ public:
         kRdnss = 8,
         kRouteUpdated = 9,
         kRouteRemoved = 10,
+        kIPv6Enable = 100,
+        kIPv6Disable = 101,
+        kNoRA = 108,
     };
 
 private:
@@ -64,6 +67,8 @@ public:
     bool parseNfPacketMessage(struct nlmsghdr *nh);
     bool parseRtMessage(const struct nlmsghdr *nh);
     bool parseNdUserOptMessage(const struct nlmsghdr *nh);
+    bool parseNewPrefixMessage(const struct nlmsghdr *nh);    
+    bool parseNoRAMessage(const struct nlmsghdr *nh);   
 };
 
 #endif

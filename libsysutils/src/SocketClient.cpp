@@ -157,6 +157,7 @@ int SocketClient::sendData(const void *data, int len) {
 
     pthread_mutex_lock(&mWriteMutex);
     int rc = sendDataLockedv(vec, 1);
+    SLOGD("SocketClient sendData done: %s", data);    
     pthread_mutex_unlock(&mWriteMutex);
 
     return rc;

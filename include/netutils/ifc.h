@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright 2008, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); 
@@ -60,7 +65,18 @@ extern int ifc_configure(const char *ifname, in_addr_t address,
                          in_addr_t dns1, in_addr_t dns2);
 
 extern in_addr_t prefixLengthToIpv4Netmask(int prefix_length);
-
+extern int ifc_is_up(const char *name, unsigned *isup);
+extern int ifc_enable_allmc(const char *name);
+extern int ifc_disable_allmc(const char *name);
+extern int ifc_reset_connection_by_uid(int uid, int error); 
+extern int ifc_set_throttle(const char *ifname, int rxKbps, int txKbps);
+extern int ifc_set_fwmark_rule(const char *ifname, int mark, int add);
+extern int ifc_set_txq_state(const char *ifname, int state);
+extern int ifc_ccmni_md_cfg(const char *ifname, int md_id);
+struct uid_err {
+    int appuid;
+	int errorNum;
+};
 __END_DECLS
 
 #endif /* _NETUTILS_IFC_H_ */

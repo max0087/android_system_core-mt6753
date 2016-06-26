@@ -20,10 +20,8 @@
 #include <pthread.h>
 #include <time.h>
 #include <sys/types.h>
-
-#include <list>
-
 #include <sysutils/SocketClient.h>
+#include <utils/List.h>
 #include <log/log.h>
 
 class LogReader;
@@ -56,7 +54,6 @@ public:
     uint64_t mStart;
     const bool mNonBlock;
     const uint64_t mEnd; // only relevant if mNonBlock
-
     // Protect List manipulations
     static void lock(void) { pthread_mutex_lock(&timesLock); }
     static void unlock(void) { pthread_mutex_unlock(&timesLock); }
@@ -71,6 +68,7 @@ public:
     }
 
     void triggerSkip_Locked(log_id_t id, unsigned int skip) { skipAhead[id] = skip; }
+    unsigned int getSkipAhead(log_id_t id) { return skipAhead[id]; }
     void cleanSkip_Locked(void);
 
     // Called after LogTimeEntry removed from list, lock implicitly held
@@ -109,6 +107,6 @@ public:
     static int FilterSecondPass(const LogBufferElement *element, void *me);
 };
 
-typedef std::list<LogTimeEntry *> LastLogTimes;
+typedef android::List<LogTimeEntry *> LastLogTimes;
 
-#endif // _LOGD_LOG_TIMES_H__
+#endif

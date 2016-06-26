@@ -109,6 +109,9 @@ static void drop_capabilities_bounding_set_if_needed() {
 }
 
 static bool should_drop_privileges() {
+#ifdef MTK_ALLOW_ADBD_ROOT
+    return false;
+#endif
 #if defined(ALLOW_ADBD_ROOT)
     char value[PROPERTY_VALUE_MAX];
 
@@ -243,6 +246,11 @@ int adb_main(int is_daemon, int server_port)
         auth_required = false;
     }
 
+    //customize
+    property_get("debug.adb_syncsize", value, "0");
+    syc_size_enabled = !strcmp(value, "1");
+    D("adb syc_size_enabled=%d\n", syc_size_enabled);
+
     adbd_auth_init();
 
     // Our external storage path may be different than apps, since
@@ -287,12 +295,16 @@ int adb_main(int is_daemon, int server_port)
 
         D("Local port disabled\n");
     } else {
+#ifdef MTK_ALLOW_ADBD_ROOT
+        D("MTK_ALLOW_ADBD_ROOT enabled\n");
+#else
         if ((root_seclabel != NULL) && (is_selinux_enabled() > 0)) {
             // b/12587913: fix setcon to allow const pointers
             if (setcon((char *)root_seclabel) < 0) {
                 exit(1);
             }
         }
+#endif
         std::string local_name = android::base::StringPrintf("tcp:%d", server_port);
         if (install_listener(local_name, "*smartsocket*", NULL, 0)) {
             exit(1);

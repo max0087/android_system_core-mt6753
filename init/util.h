@@ -63,4 +63,8 @@ int make_dir(const char *path, mode_t mode);
 int restorecon(const char *pathname);
 int restorecon_recursive(const char *pathname);
 std::string bytes_to_hex(const uint8_t *bytes, size_t bytes_len);
+#ifdef MTK_UBIFS_SUPPORT
+int ubi_attach_mtd(const char *name);
+int ubi_detach_dev(int dev);
+#endif
 #endif

@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  *  ion.c
  *
  * Memory Allocator functions for ion
@@ -31,12 +36,16 @@
 #include <linux/ion.h>
 #include <ion/ion.h>
 
+#include <cutils/properties.h>
+#include <dlfcn.h>
+#include "../../../vendor/mediatek/proprietary/external/udf/ubrd_config.h"     
+
 int ion_open()
 {
     int fd = open("/dev/ion", O_RDWR);
     if (fd < 0)
         ALOGE("open /dev/ion failed!\n");
-    return fd;
+	return fd;
 }
 
 int ion_close(int fd)
@@ -51,10 +60,10 @@ static int ion_ioctl(int fd, int req, void *arg)
 {
     int ret = ioctl(fd, req, arg);
     if (ret < 0) {
-        ALOGE("ioctl %x failed with code %d: %s\n", req,
-              ret, strerror(errno));
-        return -errno;
-    }
+		ALOGE("ioctl %x failed with code %d: %s\n", req,
+				ret, strerror(errno));
+		return -errno;
+	}
     return ret;
 }
 
@@ -118,6 +127,9 @@ int ion_map(int fd, ion_user_handle_t handle, size_t length, int prot,
     return ret;
 }
 
+#define DLSYM_FIND_MAX 10
+static int dlsym_counter = DLSYM_FIND_MAX;
+static void (*fd_bt_rd)(int) = NULL;
 int ion_share(int fd, ion_user_handle_t handle, int *share_fd)
 {
     int ret;
@@ -131,11 +143,27 @@ int ion_share(int fd, ion_user_handle_t handle, int *share_fd)
     ret = ion_ioctl(fd, ION_IOC_SHARE, &data);
     if (ret < 0)
         return ret;
-    if (data.fd < 0) {
+    *share_fd = data.fd;
+    if (*share_fd < 0) {
         ALOGE("share ioctl returned negative fd\n");
         return -EINVAL;
     }
-    *share_fd = data.fd;
+    
+#ifdef _MTK_ENG_
+    if(dlsym_counter > 0 && fd_bt_rd == NULL) {
+        dlsym_counter--;
+        fd_bt_rd = (void (*)(int))dlsym(RTLD_DEFAULT, "fdleak_record_backtrace");
+        if (!fd_bt_rd) {
+            ALOGE("[FDLEAK_TEST]dlerror:%s, %d times.\n", dlerror(), (DLSYM_FIND_MAX - dlsym_counter));
+        } else {
+            ALOGD("[FDLEAK_TEST]fdleak_record_backtrace:%p\n", fd_bt_rd);
+        }
+    }
+    if (fd_bt_rd) {
+	fd_bt_rd(*share_fd);
+    }
+#endif
+
     return ret;
 }
 

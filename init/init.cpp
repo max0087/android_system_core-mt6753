@@ -64,6 +64,10 @@
 #include "ueventd.h"
 #include "watchdogd.h"
 
+#ifdef INIT_ENG_BUILD
+#define printf(x...) NOTICE(x)
+#endif
+
 struct selabel_handle *sehandle;
 struct selabel_handle *sehandle_prop;
 
@@ -195,6 +199,9 @@ void service_start(struct service *svc, const char *dynamic_args)
     // process of exiting, we've ensured that they will immediately restart
     // on exit, unless they are ONESHOT.
     if (svc->flags & SVC_RUNNING) {
+#ifdef MTK_INIT
+        ERROR("service '%s' still running, return directly\n", svc->name);
+#endif
         return;
     }
 
@@ -328,19 +335,19 @@ void service_start(struct service *svc, const char *dynamic_args)
         // As requested, set our gid, supplemental gids, and uid.
         if (svc->gid) {
             if (setgid(svc->gid) != 0) {
-                ERROR("setgid failed: %s\n", strerror(errno));
+                ERROR("setgid failed: %s service name %s\n", strerror(errno), svc->name);
                 _exit(127);
             }
         }
         if (svc->nr_supp_gids) {
             if (setgroups(svc->nr_supp_gids, svc->supp_gids) != 0) {
-                ERROR("setgroups failed: %s\n", strerror(errno));
+                ERROR("setgroups failed: %s service name %s\n", strerror(errno), svc->name);
                 _exit(127);
             }
         }
         if (svc->uid) {
             if (setuid(svc->uid) != 0) {
-                ERROR("setuid failed: %s\n", strerror(errno));
+                ERROR("setuid failed: %s service name %s\n", strerror(errno), svc->name);
                 _exit(127);
             }
         }
@@ -733,6 +740,10 @@ static int console_init_action(int nargs, char **args)
     int fd = open(console_name, O_RDWR | O_CLOEXEC);
     if (fd >= 0)
         have_console = 1;
+#ifdef MTK_INIT
+    else
+        ERROR("console_init: can't open %s\n", console_name);
+#endif
     close(fd);
 
     fd = open("/dev/tty0", O_WRONLY | O_CLOEXEC);

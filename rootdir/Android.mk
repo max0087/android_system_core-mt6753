@@ -45,3 +45,24 @@ $(LOCAL_BUILT_MODULE): $(LOCAL_PATH)/init.environ.rc.in $(bcp_dep)
 bcp_md5 :=
 bcp_dep :=
 #######################################
+include $(CLEAR_VARS)
+LOCAL_MODULE := PPPOEStart.sh
+LOCAL_SRC_FILES := etc/PPPOEStart.sh
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc
+include $(BUILD_PREBUILT)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := ip-down
+LOCAL_SRC_FILES := etc/ppp/ip-down
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/ppp
+include $(BUILD_PREBUILT)
+
+
+include $(CLEAR_VARS)
+LOCAL_MODULE := ip-up
+LOCAL_SRC_FILES := etc/ppp/ip-up
+LOCAL_MODULE_CLASS := ETC
+LOCAL_MODULE_PATH := $(TARGET_OUT)/etc/ppp
+include $(BUILD_PREBUILT)

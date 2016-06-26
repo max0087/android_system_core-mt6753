@@ -39,6 +39,12 @@ event_flag := -DAUDITD_LOG_TAG=1003 -DLOGD_LOG_TAG=1004
 
 LOCAL_CFLAGS := -Werror $(event_flag)
 
+ifeq ($(HAVE_AEE_FEATURE), yes)
+    LOCAL_SHARED_LIBRARIES += libaed
+    LOCAL_CFALGS += -DHAVE_AEE_FEATURE
+    LOCAL_C_INCLUDES += $(MTK_ROOT)/external/aee/binary/inc
+endif
+
 include $(BUILD_EXECUTABLE)
 
 include $(CLEAR_VARS)

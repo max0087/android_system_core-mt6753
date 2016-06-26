@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2013 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +70,10 @@ bool UnwindPtrace::Unwind(size_t num_ignore_frames, ucontext_t* ucontext) {
   }
 
   UnwindMap* map = static_cast<UnwindMap*>(GetMap());
+  if (NULL == map) {
+    BACK_LOGW("GetMap before unwinding failed.");
+    return false;
+  }
   unw_map_set(addr_space_, map->GetMapCursor());
 
   upt_info_ = reinterpret_cast<struct UPT_info*>(_UPT_create(Tid()));
@@ -74,6 +83,13 @@ bool UnwindPtrace::Unwind(size_t num_ignore_frames, ucontext_t* ucontext) {
   }
 
   unw_cursor_t cursor;
+  memset(&cursor, 0, sizeof(cursor));
+  if(num_ignore_frames==0xdeaddead)
+  	{
+  		cursor.opaque[0]=0xdeaddead; //add for tell libunwind to unwind for kernel unwind userspace backtrace,lhd
+  		BACK_LOGW(" K2U_bt call into UnwindPtrace::Unwind.");
+		num_ignore_frames=0;
+  	}
   int ret = unw_init_remote(&cursor, addr_space_, upt_info_);
   if (ret < 0) {
     BACK_LOGW("unw_init_remote failed %d", ret);

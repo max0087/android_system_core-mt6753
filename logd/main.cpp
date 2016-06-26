@@ -83,11 +83,12 @@
 //    logd
 //
 
+int kernelLogFd = -1;
 static int drop_privs() {
     struct sched_param param;
     memset(&param, 0, sizeof(param));
 
-    if (set_sched_policy(0, SP_BACKGROUND) < 0) {
+    if (set_sched_policy(0, SP_FOREGROUND) < 0) {
         return -1;
     }
 
@@ -95,7 +96,7 @@ static int drop_privs() {
         return -1;
     }
 
-    if (setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_BACKGROUND) < 0) {
+    if (setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_FOREGROUND) < 0) {
         return -1;
     }
 
@@ -167,8 +168,8 @@ static LogBuffer *logBuf = NULL;
 
 static void *reinit_thread_start(void * /*obj*/) {
     prctl(PR_SET_NAME, "logd.daemon");
-    set_sched_policy(0, SP_BACKGROUND);
-    setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_BACKGROUND);
+    set_sched_policy(0, SP_FOREGROUND);
+    setpriority(PRIO_PROCESS, 0, ANDROID_PRIORITY_FOREGROUND);
 
     setgid(AID_SYSTEM);
     setuid(AID_SYSTEM);
@@ -285,7 +286,6 @@ static void readDmesg(LogAudit *al, LogKlog *kl) {
     if (!al && !kl) {
         return;
     }
-
     int len = klogctl(KLOG_SIZE_BUFFER, NULL, 0);
     if (len <= 0) {
         return;
@@ -328,7 +328,8 @@ static void readDmesg(LogAudit *al, LogKlog *kl) {
 // transitory per-client threads are created for each reader.
 int main(int argc, char *argv[]) {
     int fdPmesg = -1;
-    bool klogd = property_get_bool_svelte("logd.klogd");
+//  bool klogd = property_get_bool_svelte("logd.klogd");
+    bool klogd = property_get_bool("logd.klogd", false);
     if (klogd) {
         fdPmesg = open("/proc/kmsg", O_RDONLY | O_NDELAY);
     }

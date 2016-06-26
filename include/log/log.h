@@ -36,6 +36,7 @@
 
 #include <log/logd.h>
 #include <log/uio.h>
+#include <cutils/xlog.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,10 @@ extern "C" {
 #else
 #define LOG_NDEBUG 0
 #endif
+#endif
+
+#ifndef MTK_LOG_ENABLE
+#define MTK_LOG_ENABLE 0
 #endif
 
 /*
@@ -216,8 +221,7 @@ extern "C" {
  * Simplified macro to send a verbose system log message using the current LOG_TAG.
  */
 #ifndef SLOGV
-#define __SLOGV(...) \
-    ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
+#define __SLOGV(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
 #if LOG_NDEBUG
 #define SLOGV(...) do { if (0) { __SLOGV(__VA_ARGS__); } } while (0)
 #else
@@ -231,7 +235,7 @@ extern "C" {
 #else
 #define SLOGV_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 #endif
@@ -240,14 +244,13 @@ extern "C" {
  * Simplified macro to send a debug system log message using the current LOG_TAG.
  */
 #ifndef SLOGD
-#define SLOGD(...) \
-    ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
+#define SLOGD(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef SLOGD_IF
 #define SLOGD_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -255,14 +258,13 @@ extern "C" {
  * Simplified macro to send an info system log message using the current LOG_TAG.
  */
 #ifndef SLOGI
-#define SLOGI(...) \
-    ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
+#define SLOGI(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef SLOGI_IF
 #define SLOGI_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -270,14 +272,13 @@ extern "C" {
  * Simplified macro to send a warning system log message using the current LOG_TAG.
  */
 #ifndef SLOGW
-#define SLOGW(...) \
-    ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__))
+#define SLOGW(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef SLOGW_IF
 #define SLOGW_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -285,14 +286,13 @@ extern "C" {
  * Simplified macro to send an error system log message using the current LOG_TAG.
  */
 #ifndef SLOGE
-#define SLOGE(...) \
-    ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
+#define SLOGE(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef SLOGE_IF
 #define SLOGE_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_SYSTEM, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_SYSTEM, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -304,8 +304,7 @@ extern "C" {
  * Simplified macro to send a verbose radio log message using the current LOG_TAG.
  */
 #ifndef RLOGV
-#define __RLOGV(...) \
-    ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
+#define __RLOGV(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__))
 #if LOG_NDEBUG
 #define RLOGV(...) do { if (0) { __RLOGV(__VA_ARGS__); } } while (0)
 #else
@@ -319,7 +318,7 @@ extern "C" {
 #else
 #define RLOGV_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_VERBOSE, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 #endif
@@ -328,14 +327,13 @@ extern "C" {
  * Simplified macro to send a debug radio log message using the current LOG_TAG.
  */
 #ifndef RLOGD
-#define RLOGD(...) \
-    ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
+#define RLOGD(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef RLOGD_IF
 #define RLOGD_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -343,14 +341,13 @@ extern "C" {
  * Simplified macro to send an info radio log message using the current LOG_TAG.
  */
 #ifndef RLOGI
-#define RLOGI(...) \
-    ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
+#define RLOGI(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef RLOGI_IF
 #define RLOGI_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -358,14 +355,13 @@ extern "C" {
  * Simplified macro to send a warning radio log message using the current LOG_TAG.
  */
 #ifndef RLOGW
-#define RLOGW(...) \
-    ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__))
+#define RLOGW(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef RLOGW_IF
 #define RLOGW_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -373,14 +369,13 @@ extern "C" {
  * Simplified macro to send an error radio log message using the current LOG_TAG.
  */
 #ifndef RLOGE
-#define RLOGE(...) \
-    ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
+#define RLOGE(...) ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__))
 #endif
 
 #ifndef RLOGE_IF
 #define RLOGE_IF(cond, ...) \
     ( (__predict_false(cond)) \
-    ? ((void)__android_log_buf_print(LOG_ID_RADIO, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)) \
+    ? ((void)MTK_LOG_BUF_PRI(LOG_ID_RADIO, ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)) \
     : (void)0 )
 #endif
 
@@ -448,9 +443,28 @@ extern "C" {
  *
  * The second argument may be NULL or "" to indicate the "global" tag.
  */
+/*
 #ifndef ALOG
 #define ALOG(priority, tag, ...) \
     LOG_PRI(ANDROID_##priority, tag, __VA_ARGS__)
+#endif
+*/
+#ifndef ALOG
+#if MTK_LOG_ENABLE 	
+#define ALOG(priority, tag, ...)	XLOG_PRI(ANDROID_##priority, tag, __VA_ARGS__)
+#else 
+#define ALOG(priority, tag, ...)  LOG_PRI(ANDROID_##priority, tag, __VA_ARGS__)
+#endif
+#endif
+
+
+/*
+ * log macro 
+ */
+#if MTK_LOG_ENABLE 	
+#define MTK_LOG_BUF_PRI(id, level, tag, ...)	xlog_buf_printf(id, level, tag, __VA_ARGS__)
+#else 
+#define MTK_LOG_BUF_PRI(id, level, tag, ...)  __android_log_buf_print(id, level, tag, __VA_ARGS__)
 #endif
 
 /*
@@ -563,12 +577,6 @@ typedef enum {
 #define android_btWriteLog(tag, type, payload, len) \
     __android_log_btwrite(tag, type, payload, len)
 
-#define android_errorWriteLog(tag, subTag) \
-    __android_log_error_write(tag, subTag, -1, NULL, 0)
-
-#define android_errorWriteWithInfoLog(tag, subTag, uid, data, dataLen) \
-    __android_log_error_write(tag, subTag, uid, data, dataLen)
-
 /*
  *    IF_ALOG uses android_testLog, but IF_ALOG can be overridden.
  *    android_testLog will remain constant in its purpose as a wrapper
@@ -617,9 +625,6 @@ typedef enum log_id {
  * result of non-zero to expose a log.
  */
 int __android_log_is_loggable(int prio, const char *tag, int def);
-
-int __android_log_error_write(int tag, const char *subTag, int32_t uid, const char *data,
-                              uint32_t dataLen);
 
 /*
  * Send a simple string to the log.

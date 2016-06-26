@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -73,6 +78,9 @@ enum {
     UNKNOWN_TRANSACTION = (UNKNOWN_ERROR + 6),
 #endif    
     FDS_NOT_ALLOWED     = (UNKNOWN_ERROR + 7),
+#ifdef MTK_AOSP_ENHANCEMENT 
+    NO_AUDIO_EFFECT     = (UNKNOWN_ERROR + 0xFF),
+#endif
 };
 
 // Restore define; enumeration is in "android" namespace, so the value defined

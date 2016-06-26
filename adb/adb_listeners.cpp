@@ -44,7 +44,12 @@ void ss_listener_event_func(int _fd, unsigned ev, void *_l)
         fd = adb_socket_accept(_fd, &addr, &alen);
         if(fd < 0) return;
 
-        adb_socket_setbufsize(fd, CHUNK_SIZE);
+        //customize
+        if(syc_size_enabled == 1) {
+            adb_socket_setbufsize(fd, CHUNK_SIZE_CUSTOMIZE);
+        } else {
+            adb_socket_setbufsize(fd, CHUNK_SIZE);
+        }
 
         s = create_local_socket(fd);
         if(s) {

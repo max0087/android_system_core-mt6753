@@ -1,4 +1,9 @@
 /*
+ * Copyright (C) 2014 MediaTek Inc.
+ * Modification based on code covered by the mentioned copyright
+ * and/or permission notice(s).
+ */
+/*
  * Copyright (C) 2007-2014 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,11 +31,14 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __BIONIC__
 #include <android/set_abort_message.h>
+#endif
 
 #include <log/log.h>
 #include <log/logd.h>
 #include <log/logger.h>
+#include <cutils/xlog.h>
 
 #define LOGGER_LOG_MAIN		"log/main"
 #define LOGGER_LOG_RADIO	"log/radio"
@@ -44,7 +52,7 @@
 #define log_close(filedes) close(filedes)
 
 static int __write_to_log_init(log_id_t, struct iovec *vec, size_t nr);
-static int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
+int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
 
 static pthread_mutex_t log_init_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -167,9 +175,11 @@ int __android_log_buf_write(int bufID, int prio, const char *tag, const char *ms
             tag = tmp_tag;
     }
 
+#ifdef __BIONIC__
     if (prio == ANDROID_LOG_FATAL) {
         android_set_abort_message(msg);
     }
+#endif
 
     vec[0].iov_base   = (unsigned char *) &prio;
     vec[0].iov_len    = 1;
@@ -195,6 +205,13 @@ int __android_log_print(int prio, const char *tag, const char *fmt, ...)
     va_list ap;
     char buf[LOG_BUF_SIZE];
 
+#ifdef HAVE_XLOG_FEATURE
+#if !defined(FAKE_LOG_DEVICE)
+        if(!xlogf_native_tag_is_on(tag, prio))
+                return -1;
+#endif
+#endif
+
     va_start(ap, fmt);
     vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
     va_end(ap);
@@ -206,6 +223,13 @@ int __android_log_buf_print(int bufID, int prio, const char *tag, const char *fm
 {
     va_list ap;
     char buf[LOG_BUF_SIZE];
+
+#ifdef HAVE_XLOG_FEATURE
+#if !defined(FAKE_LOG_DEVICE)
+        if(!xlogf_native_tag_is_on(tag, prio))
+                return -1;
+#endif
+#endif
 
     va_start(ap, fmt);
     vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);

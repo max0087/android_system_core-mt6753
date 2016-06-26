@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2010 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -689,7 +694,30 @@ int write_data_chunk(struct output_file *out, unsigned int len, void *data)
 int write_fill_chunk(struct output_file *out, unsigned int len,
 		uint32_t fill_val)
 {
+#if 0
 	return out->sparse_ops->write_fill_chunk(out, len, fill_val);
+#endif
+    if(fill_val==0x00) {
+        return out->sparse_ops->write_skip_chunk(out, len);
+    }
+    else {
+      uint32_t *data = malloc(len);
+      int rtn;
+      unsigned int i;
+
+      if (!data) {
+        return -errno;
+      }
+
+      /* Initialize fill_buf with the fill_val */
+      for (i = 0; i < len / sizeof(uint32_t); i++) {
+          data[i] = fill_val;
+      }
+
+      rtn = out->sparse_ops->write_data_chunk(out, len, data);
+      free(data);
+      return rtn;
+    }
 }
 
 int write_fd_chunk(struct output_file *out, unsigned int len,

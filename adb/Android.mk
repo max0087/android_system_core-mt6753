@@ -232,11 +232,16 @@ LOCAL_CFLAGS := \
     -D_GNU_SOURCE \
     -Wno-deprecated-declarations \
 
-LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
-
 ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 LOCAL_CFLAGS += -DALLOW_ADBD_DISABLE_VERITY=1
 LOCAL_CFLAGS += -DALLOW_ADBD_ROOT=1
+endif
+
+ifeq (yes, $(strip $(MTK_BUILD_ROOT)))
+LOCAL_CFLAGS += -DMTK_ALLOW_ADBD_ROOT=1
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=1
+else
+LOCAL_CFLAGS += -DALLOW_ADBD_NO_AUTH=$(if $(filter userdebug eng,$(TARGET_BUILD_VARIANT)),1,0)
 endif
 
 LOCAL_MODULE := adbd

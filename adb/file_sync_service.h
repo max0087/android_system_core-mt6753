@@ -73,5 +73,7 @@ int do_sync_sync(const std::string& lpath, const std::string& rpath, bool list_o
 int do_sync_pull(const char *rpath, const char *lpath, int show_progress, int pullTime);
 
 #define SYNC_DATA_MAX (64*1024)
+//customize
+#define SYNC_DATA_MAX_CUSTOMIZE (4*1024)
 
 #endif

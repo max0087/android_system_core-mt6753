@@ -61,7 +61,7 @@ void ion_alloc_test()
     if(_ion_alloc_test(&fd, &handle))
         return;
 
-    ret = ion_free(fd, handle);
+	ret = ion_free(fd, handle);
     if (ret) {
         printf("%s failed: %s %d\n", __func__, strerror(ret), handle);
         return;
@@ -164,8 +164,10 @@ void ion_share_test()
         printf("master->master? [%10s]\n", ptr);
         if (recvmsg(sd[0], &msg, 0) < 0)
             perror("master recv 1");
-        close(fd);
-        _exit(0);
+		munmap(ptr, len);
+		
+		ret = ion_free(fd, handle);
+		ion_close(fd);
     } else {
         struct cmsghdr *cmsg;
         char* ptr;
@@ -206,7 +208,9 @@ void ion_share_test()
         strcpy(ptr, "child");
         printf("child sending msg 2\n");
         sendmsg(sd[1], &child_msg, 0);
-        close(fd);
+		munmap(ptr, len);
+		close(fd);
+		exit(0);
     }
 }
 

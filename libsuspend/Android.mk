@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
 # Copyright 2012 The Android Open Source Project
 
 LOCAL_PATH:= $(call my-dir)
@@ -7,6 +12,7 @@ libsuspend_src_files := \
 	autosuspend_autosleep.c \
 	autosuspend_earlysuspend.c \
 	autosuspend_wakeup_count.c \
+	autosuspend_debugger.c \
 
 libsuspend_libraries := \
 	liblog libcutils

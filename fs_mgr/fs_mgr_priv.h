@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +27,7 @@
 
 #define INFO(x...)    KLOG_INFO("fs_mgr", x)
 #define WARNING(x...) KLOG_WARNING("fs_mgr", x)
+#define NOTICE(x...)  KLOG_NOTICE("fs_mgr", x)
 #define ERROR(x...)   KLOG_ERROR("fs_mgr", x)
 
 #define CRYPTO_TMPFS_OPTIONS "size=256m,mode=0771,uid=1000,gid=1000"
@@ -79,6 +85,9 @@
 #define MF_NOTRIM       0x1000
 #define MF_FILEENCRYPTION 0x2000
 #define MF_FORMATTABLE  0x4000
+#ifdef MTK_FSTAB_FLAGS
+#define MF_RESIZE       0x10000
+#endif
 
 #define DM_BUF_SIZE 4096
 

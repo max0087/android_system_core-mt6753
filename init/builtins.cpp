@@ -320,6 +320,22 @@ int do_mount(int nargs, char **args)
         }
 
         goto exit_success;
+#ifdef MTK_UBIFS_SUPPORT
+    } else if (!strncmp(source, "ubi@", 4)) {
+        n = ubi_attach_mtd(source + 4);
+        if (n < 0)
+            return -1;
+
+        sprintf(tmp, "/dev/ubi%d_0", n);
+
+        if (wait)
+            wait_for_file(tmp, COMMAND_RETRY_TIMEOUT);
+        if (mount(tmp, target, system, flags, options) < 0) {
+            ubi_detach_dev(n);
+            return -1;
+        }
+        goto exit_success;
+#endif
     } else if (!strncmp(source, "loop@", 5)) {
         int mode, loop, fd;
         struct loop_info info;
@@ -803,9 +819,9 @@ int do_load_persist_props(int nargs, char **args) {
     return -1;
 }
 
-int do_load_system_props(int nargs, char **args) {
+int do_load_all_props(int nargs, char **args) {
     if (nargs == 1) {
-        load_system_props();
+        load_all_props();
         return 0;
     }
     return -1;
@@ -833,31 +849,18 @@ static int do_installkeys_ensure_dir_exists(const char* dir)
     return 0;
 }
 
-static bool is_file_crypto() {
-    char prop_value[PROP_VALUE_MAX] = {0};
-    property_get("ro.crypto.type", prop_value);
-    return strcmp(prop_value, "file") == 0;
-}
-
 int do_installkey(int nargs, char **args)
 {
     if (nargs != 2) {
         return -1;
     }
-    if (!is_file_crypto()) {
+
+    char prop_value[PROP_VALUE_MAX] = {0};
+    property_get("ro.crypto.type", prop_value);
+    if (strcmp(prop_value, "file")) {
         return 0;
     }
+
     return e4crypt_create_device_key(args[1],
                                      do_installkeys_ensure_dir_exists);
-}
-
-int do_setusercryptopolicies(int nargs, char **args)
-{
-    if (nargs != 2) {
-        return -1;
-    }
-    if (!is_file_crypto()) {
-        return 0;
-    }
-    return e4crypt_set_user_crypto_policies(args[1]);
 }

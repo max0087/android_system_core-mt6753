@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +20,7 @@
  */
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define LOG_TAG "NetlinkEvent"
 #include <cutils/log.h>
@@ -41,11 +47,21 @@ const int LOCAL_NFLOG_PACKET = NFNL_SUBSYS_ULOG << 8 | NFULNL_MSG_PACKET;
 
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <cutils/properties.h>
+#include <fcntl.h>
+
 
 #include <netlink/attr.h>
 #include <netlink/genl/genl.h>
 #include <netlink/handlers.h>
 #include <netlink/msg.h>
+
+
+#ifndef RTM_NORA
+const int RTM_NORA =110 ;
+#endif
+void clearRaInfoFlag(char *buff);
+void clearPrefixProp(char *buff);
 
 NetlinkEvent::NetlinkEvent() {
     mAction = Action::kUnknown;
@@ -70,6 +86,8 @@ NetlinkEvent::~NetlinkEvent() {
 void NetlinkEvent::dump() {
     int i;
 
+    SLOGD("NL action '%d'\n", mAction);
+    SLOGD("NL subsystem '%s'\n", mSubsystem);
     for (i = 0; i < NL_PARAMS_MAX; i++) {
         if (!mParams[i])
             break;
@@ -91,8 +109,13 @@ static const char *rtMessageName(int type) {
         NL_EVENT_RTM_NAME(RTM_NEWROUTE);
         NL_EVENT_RTM_NAME(RTM_DELROUTE);
         NL_EVENT_RTM_NAME(RTM_NEWNDUSEROPT);
+
         NL_EVENT_RTM_NAME(LOCAL_QLOG_NL_EVENT);
         NL_EVENT_RTM_NAME(LOCAL_NFLOG_PACKET);
+
+        NL_EVENT_RTM_NAME(RTM_NEWPREFIX);
+        NL_EVENT_RTM_NAME(RTM_NORA);
+
         default:
             return NULL;
     }
@@ -145,6 +168,10 @@ bool NetlinkEvent::parseIfInfoMessage(const struct nlmsghdr *nh) {
                 mAction = (ifi->ifi_flags & IFF_LOWER_UP) ? Action::kLinkUp :
                                                             Action::kLinkDown;
                 mSubsystem = strdup("net");
+                if(mAction == Action::kLinkDown) {
+                     clearRaInfoFlag((char *)RTA_DATA(rta));
+                     clearPrefixProp((char *)RTA_DATA(rta));
+                }
                 return true;
         }
     }
@@ -243,11 +270,15 @@ bool NetlinkEvent::parseIfAddrMessage(const struct nlmsghdr *nh) {
 
     if (cacheinfo) {
         asprintf(&mParams[4], "PREFERRED=%u", cacheinfo->ifa_prefered);
+        //avoid this value too big
+        cacheinfo->ifa_valid = cacheinfo->ifa_valid > 0 ? 1 : 0;
         asprintf(&mParams[5], "VALID=%u", cacheinfo->ifa_valid);
         asprintf(&mParams[6], "CSTAMP=%u", cacheinfo->cstamp);
         asprintf(&mParams[7], "TSTAMP=%u", cacheinfo->tstamp);
     }
 
+    SLOGD("parseIfAddrMessage: if:%s; ADDRESS %s;VALID=%u;", ifname, addrstr,
+                      cacheinfo->ifa_valid );
     return true;
 }
 
@@ -553,6 +584,12 @@ bool NetlinkEvent::parseBinaryNetlinkMessage(char *buffer, int size) {
             if (parseNfPacketMessage(nh))
                 return true;
 
+        } else if (nh->nlmsg_type == RTM_NEWPREFIX) {
+            if (parseNewPrefixMessage(nh))
+                return true;
+        } else if (nh->nlmsg_type == RTM_NORA) {
+            if (parseNoRAMessage(nh))
+                return true;
         }
     }
 
@@ -648,4 +685,156 @@ const char *NetlinkEvent::findParam(const char *paramName) {
 
     SLOGE("NetlinkEvent::FindParam(): Parameter '%s' not found", paramName);
     return NULL;
+}
+
+bool NetlinkEvent::parseNewPrefixMessage(const struct nlmsghdr *nh) {
+
+    struct prefixmsg *prefix = (prefixmsg *)NLMSG_DATA(nh);
+    int len = nh->nlmsg_len;
+    struct rtattr * tb[RTA_MAX+1];
+    char if_name[IFNAMSIZ] = "";
+
+    len -= NLMSG_LENGTH(sizeof(*prefix));
+    if (len < 0) {
+        SLOGE("BUG: wrong nlmsg len %d\n", len);
+        return false;
+    }
+
+    if (prefix->prefix_family != AF_INET6) {
+        SLOGE("wrong family %d\n", prefix->prefix_family);
+        return false;
+    }
+    if (prefix->prefix_type != 3 /*prefix opt*/) {
+        SLOGE( "wrong ND type %d\n", prefix->prefix_type);
+        return false;
+    }
+    if_indextoname(prefix->prefix_ifindex, if_name);
+    {
+        int max = RTA_MAX;
+        struct rtattr *rta = RTM_RTA(prefix);
+        memset(tb, 0, sizeof(struct rtattr *) * (max + 1));
+        while (RTA_OK(rta, len)) {
+            if ((rta->rta_type <= max) && (!tb[rta->rta_type]))
+            tb[rta->rta_type] = rta;
+            rta = RTA_NEXT(rta,len);
+        }
+        if (len)
+            SLOGE("!!!Deficit %d, rta_len=%d\n", len, rta->rta_len);
+    }
+    if (tb[PREFIX_ADDRESS] && (0 == strncmp(if_name, "ccmni", 2))) {
+        struct in6_addr *pfx;
+        char abuf[256];
+        char prefix_prop_name[PROPERTY_KEY_MAX];
+        char plen_prop_name[PROPERTY_KEY_MAX];
+        char prefix_value[PROPERTY_VALUE_MAX] = {'\0'};
+        char plen_value[4];
+
+        pfx = (struct in6_addr *)RTA_DATA(tb[PREFIX_ADDRESS]);
+
+        memset(abuf, '\0', sizeof(abuf));
+        const char* addrStr = inet_ntop(AF_INET6, pfx, abuf, sizeof(abuf));
+
+        snprintf(prefix_prop_name, sizeof(prefix_prop_name),
+            "net.ipv6.%s.prefix", if_name);
+        property_get(prefix_prop_name, prefix_value, NULL);
+        if(NULL != addrStr && strcmp(addrStr, prefix_value)){
+            SLOGI("%s new prefix: %s, len=%d\n", if_name, addrStr, prefix->prefix_len);
+
+            property_set(prefix_prop_name, addrStr);
+            snprintf(plen_prop_name, sizeof(plen_prop_name),
+                    "net.ipv6.%s.plen", if_name);
+            snprintf(plen_value, sizeof(plen_value),
+                    "%d", prefix->prefix_len);
+            property_set(plen_prop_name, plen_value);
+            {
+                char buffer[16 + IFNAMSIZ];
+                snprintf(buffer, sizeof(buffer), "INTERFACE=%s", if_name);
+                mParams[0] = strdup(buffer);
+                mAction = Action::kIPv6Enable;
+                mSubsystem = strdup("net");
+            }
+        } else {
+            SLOGD("get an exist prefix: = %s\n", addrStr);
+        }
+        return true;
+    }else{
+        SLOGD("ignore prefix of %s\n", if_name);
+        return false;
+    }
+}
+
+/*
+ * Parse a RTM_NORA message.
+ */
+
+bool NetlinkEvent::parseNoRAMessage(const struct nlmsghdr *nh) {
+    struct ifinfomsg *ifinfo= (ifinfomsg *)NLMSG_DATA(nh);
+    int len = nh->nlmsg_len;
+    char if_name[IFNAMSIZ] = "";
+    uint8_t type = nh->nlmsg_type;
+
+     // Sanity check.
+    if (type != RTM_NORA) {
+        SLOGE("%s: incorrect message type %d\n", __func__, type);
+        return false;
+    }
+
+    if (ifinfo->ifi_family != AF_INET6) {
+        SLOGE("wrong family %d\n", ifinfo->ifi_family);
+        return false;
+    }
+
+    if_indextoname(ifinfo->ifi_index, if_name);
+    SLOGD("Get NoRA Message :%s",if_name);
+    mAction = Action::kNoRA;
+    mSubsystem = strdup("net");
+    asprintf(&mParams[0], "INTERFACE=%s", if_name);
+    return true;
+}
+
+void clearRaInfoFlag(char *buff) {
+    char proc[64];
+
+    snprintf(proc, sizeof(proc), "/proc/sys/net/ipv6/conf/%s/ra_info_flag", 
+        buff);
+    int fd = open(proc, O_WRONLY);
+    if (fd < 0)
+        SLOGE("Failed to open ra_info_flag (%s)", strerror(errno));
+    else {
+    if (write(fd, "0", 1) != 1)
+        SLOGE("Failed to write ra_info_flag (%s)", strerror(errno));
+    }
+    SLOGD("clear RA flag done");
+    close(fd);	
+}
+
+void clearPrefixProp(char *buff)
+{
+    char prefix_prop_name[PROPERTY_KEY_MAX];	
+    char plen_prop_name[PROPERTY_KEY_MAX];	
+    char prop_value[PROPERTY_VALUE_MAX] = {'\0'};	
+    snprintf(prefix_prop_name, sizeof(prefix_prop_name), 
+                    "net.ipv6.%s.prefix",buff);
+    if (property_get("net.ipv6.tether", prop_value, NULL)) {
+        if(0 == strcmp(prop_value, (buff))){
+        if (property_get(prefix_prop_name, prop_value, NULL)) {
+#ifndef MTK_IPV6_TETHER_PD_MODE
+               property_set("net.ipv6.lastprefix", prop_value);
+#endif
+               SLOGD("set last prefix as %s\n", prop_value);
+        }
+        } else {
+            SLOGW("%s is not a tether interface\n", buff);
+        }
+    }
+
+    if (property_get(prefix_prop_name, prop_value, NULL)) {
+        property_set(prefix_prop_name, "");
+        SLOGD("Clear %s Done",prefix_prop_name);
+    }
+    snprintf(plen_prop_name, sizeof(plen_prop_name),
+            "net.ipv6.%s.plen", buff);
+    if (property_get(plen_prop_name, prop_value, NULL)) {
+        property_set(plen_prop_name, "");
+    }
 }

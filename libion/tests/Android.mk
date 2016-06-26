@@ -1,4 +1,9 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
 # Copyright (C) 2013 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +25,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := ion-unit-tests
 LOCAL_CFLAGS += -g -Wall -Werror -std=gnu++11 -Wno-missing-field-initializers
 LOCAL_SHARED_LIBRARIES += libion
+LOCAL_STATIC_LIBRARIES += libgtest_main
+LOCAL_MULTILIB := both
+LOCAL_MODULE_TAGS := eng
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../kernel-headers
 LOCAL_SRC_FILES := \
 	ion_test_fixture.cpp \

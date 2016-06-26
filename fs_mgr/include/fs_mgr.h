@@ -109,6 +109,16 @@ int fs_mgr_swapon_all(struct fstab *fstab);
 
 int fs_mgr_do_format(struct fstab_rec *fstab);
 
+#define PHONE_ENCRYPTED (0x4321)
+#define PHONE_UNCRYPTED (0x0)
+#define PHONE_ENCRYPT_OFFSET (2048)
+struct phone_encrypt_state {
+    int state;
+};
+
+int misc_set_phone_encrypt_state(const struct phone_encrypt_state *in, struct fstab *fstab);
+int misc_get_phone_encrypt_state(struct phone_encrypt_state *in, struct fstab *fstab);
+
 #ifdef __cplusplus
 }
 #endif

@@ -6,9 +6,24 @@ LOCAL_PATH:= $(call my-dir)
 
 ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 init_options += -DALLOW_LOCAL_PROP_OVERRIDE=1 -DALLOW_DISABLE_SELINUX=1
+init_options += -DINIT_ENG_BUILD
+else
+ifeq ($(strip $(MTK_BUILD_ROOT)),yes)
+init_options += -DALLOW_LOCAL_PROP_OVERRIDE=1 -DALLOW_DISABLE_SELINUX=1
 else
 init_options += -DALLOW_LOCAL_PROP_OVERRIDE=0 -DALLOW_DISABLE_SELINUX=0
 endif
+endif
+
+# add mtk fstab flags support
+init_options += -DMTK_FSTAB_FLAGS
+# end
+
+# add for mtk init
+ifneq ($(BUILD_MTK_LDVT), yes)
+init_options += -DMTK_INIT
+endif
+# end
 
 init_options += -DLOG_UEVENTS=0
 
@@ -30,6 +45,10 @@ LOCAL_SRC_FILES:= \
     parser.cpp \
     util.cpp \
 
+ifeq ($(strip $(MTK_NAND_UBIFS_SUPPORT)),yes)
+LOCAL_CFLAGS += -DMTK_UBIFS_SUPPORT
+endif
+
 LOCAL_STATIC_LIBRARIES := libbase
 LOCAL_MODULE := libinit
 LOCAL_CLANG := $(init_clang)
@@ -49,6 +68,10 @@ LOCAL_SRC_FILES:= \
     ueventd_parser.cpp \
     watchdogd.cpp \
 
+ifeq ($(strip $(MTK_NAND_UBIFS_SUPPORT)),yes)
+LOCAL_CFLAGS += -DMTK_UBIFS_SUPPORT
+endif
+
 LOCAL_MODULE:= init
 LOCAL_C_INCLUDES += \
     system/extras/ext4_utils \
@@ -63,9 +86,9 @@ LOCAL_STATIC_LIBRARIES := \
     libfs_mgr \
     libsquashfs_utils \
     liblogwrap \
-    libcutils \
     libbase \
     libext4_utils_static \
+    libcutils \
     libutils \
     liblog \
     libc \

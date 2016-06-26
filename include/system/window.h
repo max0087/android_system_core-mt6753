@@ -277,6 +277,9 @@ enum {
      * age will be 0.
      */
     NATIVE_WINDOW_BUFFER_AGE = 13,
+#ifdef MTK_AOSP_ENHANCEMENT
+    NATIVE_WINDOW_CONSUMER_PID = 100,
+#endif
 };
 
 /* Valid operations for the (*perform)() hook.

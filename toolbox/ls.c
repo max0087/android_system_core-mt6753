@@ -175,7 +175,12 @@ static void user2str(uid_t uid, char *out, size_t out_size)
 {
     struct passwd *pw = getpwuid(uid);
     if(pw) {
-        strlcpy(out, pw->pw_name, out_size);
+	if (pw->pw_name != NULL) {
+	    strlcpy(out, pw->pw_name, out_size);
+	}
+	else {
+	    out[0] = '\0';
+	}
     } else {
         snprintf(out, out_size, "%d", uid);
     }
@@ -185,7 +190,12 @@ static void group2str(gid_t gid, char *out, size_t out_size)
 {
     struct group *gr = getgrgid(gid);
     if(gr) {
-        strlcpy(out, gr->gr_name, out_size);
+	if (gr->gr_name != NULL) {
+	    strlcpy(out, gr->gr_name, out_size);
+	}
+	else {
+	    out[0] = '\0';
+	}
     } else {
         snprintf(out, out_size, "%d", gid);
     }

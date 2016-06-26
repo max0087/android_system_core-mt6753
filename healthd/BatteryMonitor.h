@@ -41,12 +41,13 @@ class BatteryMonitor {
     bool update(void);
     status_t getProperty(int id, struct BatteryProperty *val);
     void dumpState(int fd);
+    void update_smb(void);
+    void cmd_send(void);
 
   private:
     struct healthd_config *mHealthdConfig;
     Vector<String8> mChargerNames;
     bool mBatteryDevicePresent;
-    bool mAlwaysPluggedDevice;
     int mBatteryFixedCapacity;
     int mBatteryFixedTemperature;
     struct BatteryProperties props;
@@ -57,6 +58,7 @@ class BatteryMonitor {
     PowerSupplyType readPowerSupplyType(const String8& path);
     bool getBooleanField(const String8& path);
     int getIntField(const String8& path);
+    int mBatteryFixedCapacity_smb;
 };
 
 }; // namespace android

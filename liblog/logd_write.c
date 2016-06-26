@@ -1,4 +1,9 @@
 /*
+ * Copyright (C) 2014 MediaTek Inc.
+ * Modification based on code covered by the mentioned copyright
+ * and/or permission notice(s).
+ */
+/*
  * Copyright (C) 2007-2014 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,6 +49,7 @@
 #include <log/log_read.h>
 #include <private/android_filesystem_config.h>
 #include <private/android_logger.h>
+#include <cutils/xlog.h>
 
 #define LOG_BUF_SIZE 1024
 
@@ -53,7 +59,7 @@
 #endif
 
 static int __write_to_log_init(log_id_t, struct iovec *vec, size_t nr);
-static int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
+int (*write_to_log)(log_id_t, struct iovec *vec, size_t nr) = __write_to_log_init;
 #if !defined(_WIN32)
 static pthread_mutex_t log_init_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -110,9 +116,9 @@ static int __write_to_log_initialize()
         i = TEMP_FAILURE_RETRY(socket(PF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0));
         if (i < 0) {
             ret = -errno;
-        } else if (TEMP_FAILURE_RETRY(fcntl(i, F_SETFL, O_NONBLOCK)) < 0) {
+       /* } else if (TEMP_FAILURE_RETRY(fcntl(i, F_SETFL, O_NONBLOCK)) < 0) {
             ret = -errno;
-            close(i);
+            close(i);*/
         } else {
             struct sockaddr_un un;
             memset(&un, 0, sizeof(struct sockaddr_un));
@@ -415,6 +421,13 @@ int __android_log_print(int prio, const char *tag, const char *fmt, ...)
     va_list ap;
     char buf[LOG_BUF_SIZE];
 
+#ifdef HAVE_XLOG_FEATURE
+#if !defined(FAKE_LOG_DEVICE)
+        if(!xlogf_native_tag_is_on(tag, prio))
+                return -1;
+#endif
+#endif
+
     va_start(ap, fmt);
     vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);
     va_end(ap);
@@ -426,6 +439,13 @@ int __android_log_buf_print(int bufID, int prio, const char *tag, const char *fm
 {
     va_list ap;
     char buf[LOG_BUF_SIZE];
+
+#ifdef HAVE_XLOG_FEATURE
+#if !defined(FAKE_LOG_DEVICE)
+        if(!xlogf_native_tag_is_on(tag, prio))
+                return -1;
+#endif
+#endif
 
     va_start(ap, fmt);
     vsnprintf(buf, LOG_BUF_SIZE, fmt, ap);

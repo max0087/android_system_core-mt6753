@@ -1886,7 +1886,42 @@ static void run(const char* source_path, const char* label, uid_t uid,
     ERROR("terminated prematurely\n");
     exit(1);
 }
+typedef enum {
+    NORMAL_BOOT = 0,
+    META_BOOT = 1,
+    RECOVERY_BOOT = 2,
+    SW_REBOOT = 3,
+    FACTORY_BOOT = 4,
+    ADVMETA_BOOT = 5,
+    ATE_FACTORY_BOOT = 6,
+    ALARM_BOOT = 7,
+    UNKNOWN_BOOT
+} BOOT_MODE;
+static int get_boot_mode(void)
+{
+  int fd;
+  size_t s;
+  char boot_mode[2];
+  memset(boot_mode, 0x00, sizeof(boot_mode));
 
+  fd = open("/sys/class/BOOT/BOOT/boot/boot_mode", O_RDONLY);
+  if (fd < 0)
+  {
+    printf("fail to open: %s\n", "/sys/class/BOOT/BOOT/boot/boot_mode");
+    return 0;
+  }
+
+  s = read(fd, (void *)boot_mode, sizeof(char));
+  close(fd);
+
+  if(s <= 0)
+  {
+    ERROR("could not read boot mode sys file\n");
+    return 0;
+  }
+
+  return atoi(boot_mode);
+}
 int main(int argc, char **argv) {
     const char *source_path = NULL;
     const char *label = NULL;
@@ -1954,9 +1989,11 @@ int main(int argc, char **argv) {
         ERROR("Error setting RLIMIT_NOFILE, errno = %d\n", errno);
     }
 
+    if(get_boot_mode() == NORMAL_BOOT) {
     while ((fs_read_atomic_int("/data/.layout_version", &fs_version) == -1) || (fs_version < 3)) {
         ERROR("installd fs upgrade not yet complete. Waiting...\n");
         sleep(1);
+    }
     }
 
     run(source_path, label, uid, gid, userid, multi_user, full_write);

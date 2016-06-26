@@ -1,4 +1,9 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
 # Copyright (C) 2008-2014 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +30,7 @@ include $(CLEAR_VARS)
 liblog_cflags := -DLIBLOG_LOG_TAG=1005
 
 ifneq ($(TARGET_USES_LOGD),false)
-liblog_sources := logd_write.c log_event_write.c
+liblog_sources := logd_write.c
 else
 liblog_sources := logd_write_kern.c
 endif
@@ -58,6 +63,8 @@ endif
 LOCAL_MODULE := liblog
 LOCAL_SRC_FILES := $(liblog_host_sources)
 LOCAL_CFLAGS := -DFAKE_LOG_DEVICE=1 -Werror $(liblog_cflags)
+LOCAL_LDLIBS := -lpthread
+LOCAL_WHOLE_STATIC_LIBRARIES := libxlog
 LOCAL_MULTILIB := both
 include $(BUILD_HOST_STATIC_LIBRARY)
 
@@ -70,12 +77,12 @@ endif
 LOCAL_MULTILIB := both
 include $(BUILD_HOST_SHARED_LIBRARY)
 
-
 # Shared and static library for target
 # ========================================================
 include $(CLEAR_VARS)
 LOCAL_MODULE := liblog
 LOCAL_SRC_FILES := $(liblog_target_sources)
+LOCAL_WHOLE_STATIC_LIBRARIES := libxlog
 LOCAL_CFLAGS := -Werror $(liblog_cflags)
 include $(BUILD_STATIC_LIBRARY)
 

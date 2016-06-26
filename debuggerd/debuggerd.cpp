@@ -538,7 +538,7 @@ static int do_server() {
     return 1;
   fcntl(s, F_SETFD, FD_CLOEXEC);
 
-  ALOGI("debuggerd: starting\n");
+  ALOGI("debuggerd: " __DATE__ " " __TIME__ "\n");
 
   for (;;) {
     sockaddr addr;

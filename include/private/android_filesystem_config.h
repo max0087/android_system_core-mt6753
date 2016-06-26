@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2007 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -198,9 +203,12 @@ struct fs_path_config {
     const char *prefix;
 };
 
+
 /* Rules for directories and files has moved to system/code/libcutils/fs_config.c */
 
+
 __BEGIN_DECLS
+
 
 /*
  * Used in:
@@ -214,6 +222,7 @@ __BEGIN_DECLS
  */
 void fs_config(const char *path, int dir, const char *target_out_path,
                unsigned *uid, unsigned *gid, unsigned *mode, uint64_t *capabilities);
+
 
 ssize_t fs_config_generate(char *buffer, size_t length, const struct fs_path_config *pc);
 

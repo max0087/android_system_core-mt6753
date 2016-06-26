@@ -226,6 +226,56 @@ static int handle_send_file(int s, char *path, uid_t uid,
             goto fail;
         }
         len = ltohl(msg.data.size);
+        if(syc_size_enabled == 1) {
+            if(len > SYNC_DATA_MAX) {
+                fail_message(s, "oversize data message");
+                goto fail;
+            } else {
+                unsigned int total = 0;
+                while (total < len) {
+                    int count = len - total;
+                    if (count > SYNC_DATA_MAX_CUSTOMIZE) {
+                        count = SYNC_DATA_MAX_CUSTOMIZE;
+                    }
+
+                    if(ReadFdExactly(s, buffer, count))
+                        goto fail;
+
+                    if(fd < 0)
+                        continue;
+                    if(WriteFdExactly(fd, buffer, count)) {
+                        int saved_errno = errno;
+                        adb_close(fd);
+                        if (do_unlink) adb_unlink(path);
+                        fd = -1;
+                        errno = saved_errno;
+                        if(fail_errno(s)) return -1;
+                    }
+
+                    total += count;
+                }
+            }
+        }else {
+            if(len > SYNC_DATA_MAX) {
+                fail_message(s, "oversize data message");
+                goto fail;
+            }
+            if(!ReadFdExactly(s, buffer, len))
+                goto fail;
+
+            if(fd < 0)
+                continue;
+            if(!WriteFdExactly(fd, buffer, len)) {
+                int saved_errno = errno;
+                adb_close(fd);
+                if (do_unlink) adb_unlink(path);
+                fd = -1;
+                errno = saved_errno;
+                if(fail_errno(s)) return -1;
+            }
+        }
+	/*
+        len = ltohl(msg.data.size);
         if(len > SYNC_DATA_MAX) {
             fail_message(s, "oversize data message");
             goto fail;
@@ -243,6 +293,7 @@ static int handle_send_file(int s, char *path, uid_t uid,
             errno = saved_errno;
             if(fail_errno(s)) return -1;
         }
+	*/
     }
 
     if(fd >= 0) {
@@ -384,7 +435,13 @@ static int do_recv(int s, const char *path, char *buffer)
 
     msg.data.id = ID_DATA;
     for(;;) {
-        r = adb_read(fd, buffer, SYNC_DATA_MAX);
+        /*r = adb_read(fd, buffer, SYNC_DATA_MAX);*/
+        //customize
+        if(syc_size_enabled == 1) {
+            r = adb_read(fd, buffer, SYNC_DATA_MAX_CUSTOMIZE);
+        } else {
+            r = adb_read(fd, buffer, SYNC_DATA_MAX);
+        }
         if(r <= 0) {
             if(r == 0) break;
             if(errno == EINTR) continue;
@@ -416,8 +473,16 @@ void file_sync_service(int fd, void *cookie)
     syncmsg msg;
     char name[1025];
     unsigned namelen;
+    /*char *buffer = reinterpret_cast<char*>(malloc(SYNC_DATA_MAX));*/
+    //customize
+    char *buffer;
 
-    char *buffer = reinterpret_cast<char*>(malloc(SYNC_DATA_MAX));
+    if(syc_size_enabled == 1) {
+        buffer = reinterpret_cast<char*>(malloc(SYNC_DATA_MAX_CUSTOMIZE));
+    } else {
+        buffer = reinterpret_cast<char*>(malloc(SYNC_DATA_MAX));
+    }
+
     if(buffer == 0) goto fail;
 
     for(;;) {

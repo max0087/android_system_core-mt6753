@@ -55,6 +55,10 @@
 #include "util.h"
 #include "log.h"
 
+#ifdef MTK_INIT
+#include <sys/system_properties.h>
+#include <cutils/android_reboot.h>
+#endif
 #define PERSISTENT_PROPERTY_DIR  "/data/property"
 #define FSTAB_PREFIX "/fstab."
 #define RECOVERY_MOUNT_POINT "/recovery"
@@ -219,18 +223,28 @@ static int property_set_impl(const char* name, const char* value) {
 
     if(pi != 0) {
         /* ro.* properties may NEVER be modified once set */
-        if(!strncmp(name, "ro.", 3)) return -1;
-
+        if(!strncmp(name, "ro.", 3)) {
+#ifdef MTK_INIT
+            ERROR("PropSet Error:[%s:%s]  ro.* properties may NEVER be modified once set\n", name, value);
+#endif
+            return -1;
+        }
         __system_property_update(pi, value, valuelen);
     } else {
         int rc = __system_property_add(name, namelen, value, valuelen);
         if (rc < 0) {
+#ifdef MTK_INIT
+            ERROR("Failed to set '%s'='%s'\n", name, value);
+#endif
             return rc;
         }
     }
     /* If name starts with "net." treat as a DNS property. */
     if (strncmp("net.", name, strlen("net.")) == 0)  {
         if (strcmp("net.change", name) == 0) {
+#ifdef MTK_INIT
+            //INFO("PropSet [%s:%s] Done\n", name, value);
+#endif
             return 0;
         }
        /*
@@ -248,8 +262,32 @@ static int property_set_impl(const char* name, const char* value) {
         write_persistent_property(name, value);
     }
     property_changed(name, value);
+#ifdef MTK_INIT
+    //INFO("PropSet [%s:%s] Done\n", name, value);
+#endif
     return 0;
 }
+
+#ifdef MTK_INIT
+int reboot_pid(int pid) {
+    int fd = open("/proc/mtprof/reboot_pid", O_RDWR);
+    char buf[100];
+    int cnt;
+
+    cnt = sprintf(buf, "%d", pid);
+
+    fprintf(stderr, "reboot  pid is %d, %s.\n", pid, buf);
+    if(fd > 0) {
+        write(fd, buf, cnt);
+        close(fd);
+        return 1;
+    } else {
+        fprintf(stderr, "open /proc/mtprof/reboot_pid error");
+    }
+
+    return 0;
+}
+#endif
 
 int property_set(const char* name, const char* value) {
     int rc = property_set_impl(name, value);
@@ -324,6 +362,9 @@ static void handle_property_set_fd()
             // ctl.* properties.
             close(s);
             if (check_control_mac_perms(msg.value, source_ctx)) {
+#ifdef MTK_INIT
+                //INFO("[PropSet]: pid:%u uid:%u gid:%u %s %s\n", cr.pid, cr.uid, cr.gid, msg.name, msg.value);
+#endif
                 handle_control_message((char*) msg.name + 4, (char*) msg.value);
             } else {
                 ERROR("sys_prop: Unable to %s service ctl [%s] uid:%d gid:%d pid:%d\n",
@@ -331,6 +372,13 @@ static void handle_property_set_fd()
             }
         } else {
             if (check_perms(msg.name, source_ctx)) {
+#ifdef MTK_INIT
+                //INFO("[PropSet]: pid:%u uid:%u gid:%u set %s=%s\n", cr.pid, cr.uid, cr.gid, msg.name, msg.value);
+                if(strcmp(msg.name, ANDROID_RB_PROPERTY) == 0) {
+                    INFO("pid %d set %s=%s\n", cr.pid, msg.name, msg.value);
+                    reboot_pid(cr.pid);
+                }
+#endif
                 property_set((char*) msg.name, (char*) msg.value);
             } else {
                 ERROR("sys_prop: permission denied uid:%d  name:%s\n",
@@ -393,7 +441,9 @@ static void load_properties(char *data, const char *filter)
                 *key++ = 0;
                 while (isspace(*key)) key++;
             }
-
+#ifdef MTK_INIT
+            //NOTICE("import properties %s from %s\n", key, fn);
+#endif
             load_properties_from_file(fn, key);
 
         } else {
@@ -430,6 +480,10 @@ static void load_properties_from_file(const char* filename, const char* filter) 
         data.push_back('\n');
         load_properties(&data[0], filter);
     }
+#ifdef MTK_INIT
+    else
+        ERROR("can not load properties %s from %s\n", filter, filename);
+#endif
     NOTICE("(Loading properties from %s took %.2fs.)\n", filename, t.duration());
 }
 
@@ -560,10 +614,16 @@ void load_recovery_id_prop() {
     close(fd);
 }
 
-void load_system_props() {
+void load_all_props() {
     load_properties_from_file(PROP_PATH_SYSTEM_BUILD, NULL);
     load_properties_from_file(PROP_PATH_VENDOR_BUILD, NULL);
     load_properties_from_file(PROP_PATH_FACTORY, "ro.*");
+
+    load_override_properties();
+
+    /* Read persistent properties after all default values have been loaded. */
+    load_persistent_properties();
+
     load_recovery_id_prop();
 }
 

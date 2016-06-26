@@ -50,6 +50,8 @@
 
 ADB_MUTEX_DEFINE( D_lock );
 
+//customize
+int syc_size_enabled;
 int HOST = 0;
 
 #if !ADB_HOST

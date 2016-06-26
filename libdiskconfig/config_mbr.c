@@ -228,6 +228,20 @@ mk_mbr_sig()
     return item;
 }
 
+static struct write_list *
+erase_mbr()
+{
+    struct write_list *item;
+    if (!(item = alloc_wl(PC_MBR_SIZE))) {
+        ALOGE("Unable to allocate memory for MBR erasing.");
+        return NULL;
+    }
+    
+    item->offset = PC_MBR_DISK_OFFSET;
+    memset(item->data, 0x00, PC_MBR_SIZE);
+    return item;
+}
+
 struct write_list *
 config_mbr(struct disk_info *dinfo)
 {
@@ -301,6 +315,14 @@ config_mbr(struct disk_info *dinfo)
     else {
         ALOGE("Cannot set MBR signature");
         goto fail;
+    }
+
+    /* must do erasing mbr at the last because wr_list is last-in-first-out */
+    if ((temp_wr = erase_mbr()))
+           wlist_add(&wr_list, temp_wr);
+       else {
+           ALOGE("Cannot erase MBR");
+           goto fail;
     }
 
     return wr_list;

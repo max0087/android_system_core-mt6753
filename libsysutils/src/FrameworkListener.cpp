@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2008 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -93,6 +98,7 @@ void FrameworkListener::dispatchCommand(SocketClient *cli, char *data) {
     bool esc = false;
     bool quote = false;
     bool haveCmdNum = !mWithSeq;
+    SLOGD("dispatchCommand data = (%s)", data);
 
     memset(argv, 0, sizeof(argv));
     memset(tmp, 0, sizeof(tmp));

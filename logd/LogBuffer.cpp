@@ -167,15 +167,17 @@ int LogBuffer::log(log_id_t log_id, log_time realtime,
     //  NB: if end is region locked, place element at end of list
     LogBufferElementCollection::iterator it = mLogElements.end();
     LogBufferElementCollection::iterator last = it;
+    int time_find_count = 0;
     while (last != mLogElements.begin()) {
         --it;
         if ((*it)->getRealTime() <= realtime) {
             break;
         }
         last = it;
+        time_find_count++;
     }
 
-    if (last == mLogElements.end()) {
+    if (last == mLogElements.end() || time_find_count > 20) {
         mLogElements.push_back(elem);
     } else {
         uint64_t end = 1;
@@ -217,42 +219,29 @@ int LogBuffer::log(log_id_t log_id, log_time realtime,
     return len;
 }
 
-// Prune at most 10% of the log entries or 256, whichever is less.
+// If we're using more than 256K of memory for log entries, prune
+// at least 10% of the log entries.
 //
 // mLogElementsLock must be held when this function is called.
 void LogBuffer::maybePrune(log_id_t id) {
     size_t sizes = stats.sizes(id);
-    unsigned long maxSize = log_buffer_size(id);
-    if (sizes > maxSize) {
-        size_t sizeOver = sizes - ((maxSize * 9) / 10);
+    if (sizes > log_buffer_size(id)) {
+        size_t sizeOver90Percent = sizes - ((log_buffer_size(id) * 9) / 10);
         size_t elements = stats.elements(id);
-        size_t minElements = elements / 10;
-        unsigned long pruneRows = elements * sizeOver / sizes;
-        if (pruneRows <= minElements) {
-            pruneRows = minElements;
-        }
-        if (pruneRows > 256) {
-            pruneRows = 256;
+        unsigned long pruneRows = elements * sizeOver90Percent / sizes;
+        elements /= 10;
+        if (pruneRows <= elements) {
+            pruneRows = elements;
         }
         prune(id, pruneRows);
     }
 }
 
-LogBufferElementCollection::iterator LogBuffer::erase(
-        LogBufferElementCollection::iterator it, bool engageStats) {
+LogBufferElementCollection::iterator LogBuffer::erase(LogBufferElementCollection::iterator it) {
     LogBufferElement *e = *it;
-    log_id_t id = e->getLogId();
 
-    LogBufferIteratorMap::iterator f = mLastWorstUid[id].find(e->getUid());
-    if ((f != mLastWorstUid[id].end()) && (it == f->second)) {
-        mLastWorstUid[id].erase(f);
-    }
     it = mLogElements.erase(it);
-    if (engageStats) {
-        stats.subtract(e);
-    } else {
-        stats.erase(e);
-    }
+    stats.subtract(e);
     delete e;
 
     return it;
@@ -329,51 +318,7 @@ public:
 
 // prune "pruneRows" of type "id" from the buffer.
 //
-// This garbage collection task is used to expire log entries. It is called to
-// remove all logs (clear), all UID logs (unprivileged clear), or every
-// 256 or 10% of the total logs (whichever is less) to prune the logs.
-//
-// First there is a prep phase where we discover the reader region lock that
-// acts as a backstop to any pruning activity to stop there and go no further.
-//
-// There are three major pruning loops that follow. All expire from the oldest
-// entries. Since there are multiple log buffers, the Android logging facility
-// will appear to drop entries 'in the middle' when looking at multiple log
-// sources and buffers. This effect is slightly more prominent when we prune
-// the worst offender by logging source. Thus the logs slowly loose content
-// and value as you move back in time. This is preferred since chatty sources
-// invariably move the logs value down faster as less chatty sources would be
-// expired in the noise.
-//
-// The first loop performs blacklisting and worst offender pruning. Falling
-// through when there are no notable worst offenders and have not hit the
-// region lock preventing further worst offender pruning. This loop also looks
-// after managing the chatty log entries and merging to help provide
-// statistical basis for blame. The chatty entries are not a notification of
-// how much logs you may have, but instead represent how much logs you would
-// have had in a virtual log buffer that is extended to cover all the in-memory
-// logs without loss. They last much longer than the represented pruned logs
-// since they get multiplied by the gains in the non-chatty log sources.
-//
-// The second loop get complicated because an algorithm of watermarks and
-// history is maintained to reduce the order and keep processing time
-// down to a minimum at scale. These algorithms can be costly in the face
-// of larger log buffers, or severly limited processing time granted to a
-// background task at lowest priority.
-//
-// This second loop does straight-up expiration from the end of the logs
-// (again, remember for the specified log buffer id) but does some whitelist
-// preservation. Thus whitelist is a Hail Mary low priority, blacklists and
-// spam filtration all take priority. This second loop also checks if a region
-// lock is causing us to buffer too much in the logs to help the reader(s),
-// and will tell the slowest reader thread to skip log entries, and if
-// persistent and hits a further threshold, kill the reader thread.
-//
-// The third thread is optional, and only gets hit if there was a whitelist
-// and more needs to be pruned against the backstop of the region lock.
-//
 // mLogElementsLock must be held when this function is called.
-//
 void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
     LogTimeEntry *oldest = NULL;
 
@@ -388,6 +333,12 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
             oldest = entry;
         }
         t++;
+    }
+
+    if (oldest && (oldest->getSkipAhead(id) != 0)) {
+        //kernel_log_print("oldest still has skip item!%ld", stats.sizes(id));
+        LogTimeEntry::unlock();
+        return;
     }
 
     LogBufferElementCollection::iterator it;
@@ -421,6 +372,7 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
 
     // prune by worst offender by uid
     bool hasBlacklist = mPrune.naughty();
+    goto PRUNE;
     while (pruneRows > 0) {
         // recalculate the worst offender on every batched pass
         uid_t worst = (uid_t) -1;
@@ -435,10 +387,7 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
                     worst_sizes = sorted[0]->getSizes();
                     // Calculate threshold as 12.5% of available storage
                     size_t threshold = log_buffer_size(id) / 8;
-                    if ((worst_sizes > threshold)
-                        // Allow time horizon to extend roughly tenfold, assume
-                        // average entry length is 100 characters.
-                            && (worst_sizes > (10 * sorted[0]->getDropped()))) {
+                    if (worst_sizes > threshold) {
                         worst = sorted[0]->getKey();
                         second_worst_sizes = sorted[1]->getSizes();
                         if (second_worst_sizes < threshold) {
@@ -456,28 +405,8 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
 
         bool kick = false;
         bool leading = true;
-        it = mLogElements.begin();
-        // Perform at least one mandatory garbage collection cycle in following
-        // - clear leading chatty tags
-        // - merge chatty tags
-        // - check age-out of preserved logs
-        bool gc = pruneRows <= 1;
-        if (!gc && (worst != (uid_t) -1)) {
-            LogBufferIteratorMap::iterator f = mLastWorstUid[id].find(worst);
-            if ((f != mLastWorstUid[id].end())
-                    && (f->second != mLogElements.end())) {
-                leading = false;
-                it = f->second;
-            }
-        }
-        static const timespec too_old = {
-            EXPIRE_HOUR_THRESHOLD * 60 * 60, 0
-        };
-        LogBufferElementCollection::iterator lastt;
-        lastt = mLogElements.end();
-        --lastt;
         LogBufferElementLast last;
-        while (it != mLogElements.end()) {
+        for(it = mLogElements.begin(); it != mLogElements.end();) {
             LogBufferElement *e = *it;
 
             if (oldest && (oldest->mStart <= e->getSequence())) {
@@ -499,7 +428,9 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
 
             // merge any drops
             if (dropped && last.merge(e, dropped)) {
-                it = erase(it, false);
+                it = mLogElements.erase(it);
+                stats.erase(e);
+                delete e;
                 continue;
             }
 
@@ -525,24 +456,25 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
                 continue;
             }
 
-            if ((e->getRealTime() < ((*lastt)->getRealTime() - too_old))
-                    || (e->getRealTime() > (*lastt)->getRealTime())) {
-                break;
-            }
-
-            // unmerged drop message
             if (dropped) {
                 last.add(e);
-                if ((!gc && (e->getUid() == worst))
-                        || (mLastWorstUid[id].find(e->getUid())
-                            == mLastWorstUid[id].end())) {
-                    mLastWorstUid[id][e->getUid()] = it;
-                }
                 ++it;
                 continue;
             }
 
             if (e->getUid() != worst) {
+                if (leading) {
+                    static const timespec too_old = {
+                        EXPIRE_HOUR_THRESHOLD * 60 * 60, 0
+                    };
+                    LogBufferElementCollection::iterator last;
+                    last = mLogElements.end();
+                    --last;
+                    if ((e->getRealTime() < ((*last)->getRealTime() - too_old))
+                            || (e->getRealTime() > (*last)->getRealTime())) {
+                        break;
+                    }
+                }
                 leading = false;
                 last.clear(e);
                 ++it;
@@ -565,13 +497,11 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
                 stats.drop(e);
                 e->setDropped(1);
                 if (last.merge(e, 1)) {
-                    it = erase(it, false);
+                    it = mLogElements.erase(it);
+                    stats.erase(e);
+                    delete e;
                 } else {
                     last.add(e);
-                    if (!gc || (mLastWorstUid[id].find(worst)
-                                == mLastWorstUid[id].end())) {
-                        mLastWorstUid[id][worst] = it;
-                    }
                     ++it;
                 }
             }
@@ -586,7 +516,7 @@ void LogBuffer::prune(log_id_t id, unsigned long pruneRows, uid_t caller_uid) {
             break; // the following loop will ask bad clients to skip/drop
         }
     }
-
+PRUNE:
     bool whitelist = false;
     bool hasWhitelist = mPrune.nice();
     it = mLogElements.begin();

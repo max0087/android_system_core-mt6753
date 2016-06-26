@@ -16,7 +16,9 @@ on boot
     chown root shell /sys/kernel/debug/tracing/events/power/cpu_idle/enable
     chown root shell /sys/kernel/debug/tracing/events/power/clock_set_rate/enable
     chown root shell /sys/kernel/debug/tracing/events/cpufreq_interactive/enable
-    chown root shell /sys/kernel/debug/tracing/tracing_on
+    # change to system owner for AMS to control
+    chown system shell /sys/kernel/debug/tracing/tracing_on
+    chown root shell /sys/kernel/debug/tracing/set_event
 
     chmod 0664 /sys/kernel/debug/tracing/trace_clock
     chmod 0664 /sys/kernel/debug/tracing/buffer_size_kb
@@ -29,7 +31,8 @@ on boot
     chmod 0664 /sys/kernel/debug/tracing/events/power/clock_set_rate/enable
     chmod 0664 /sys/kernel/debug/tracing/events/cpufreq_interactive/enable
     chmod 0664 /sys/kernel/debug/tracing/tracing_on
+    chmod 0664 /sys/kernel/debug/tracing/set_event
 
 # Allow only the shell group to read and truncate the kernel trace.
     chown root shell /sys/kernel/debug/tracing/trace
-    chmod 0660 /sys/kernel/debug/tracing/trace
+    chmod 0664 /sys/kernel/debug/tracing/trace

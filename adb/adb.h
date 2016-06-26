@@ -25,6 +25,10 @@
 
 #define MAX_PAYLOAD 4096
 
+//customize
+extern int syc_size_enabled;
+#define CHUNK_SIZE_CUSTOMIZE (4*1024)
+
 #define A_SYNC 0x434e5953
 #define A_CNXN 0x4e584e43
 #define A_OPEN 0x4e45504f

@@ -36,8 +36,8 @@
 using namespace android;
 
 // Periodic chores intervals in seconds
-#define DEFAULT_PERIODIC_CHORES_INTERVAL_FAST (60 * 1)
-#define DEFAULT_PERIODIC_CHORES_INTERVAL_SLOW (60 * 10)
+#define DEFAULT_PERIODIC_CHORES_INTERVAL_FAST (24 * 60 * 60)
+#define DEFAULT_PERIODIC_CHORES_INTERVAL_SLOW (24 * 60 * 60)
 
 static struct healthd_config healthd_config = {
     .periodic_chores_interval_fast = DEFAULT_PERIODIC_CHORES_INTERVAL_FAST,
@@ -52,6 +52,10 @@ static struct healthd_config healthd_config = {
     .batteryCurrentNowPath = String8(String8::kEmptyString),
     .batteryCurrentAvgPath = String8(String8::kEmptyString),
     .batteryChargeCounterPath = String8(String8::kEmptyString),
+    .batteryStatusPath_smb = String8(String8::kEmptyString),
+    .batteryPresentPath_smb= String8(String8::kEmptyString),
+    .batteryCapacityPath_smb = String8(String8::kEmptyString),
+    .batteryAdjustPowerPath = String8(String8::kEmptyString),
     .energyCounter = NULL,
     .boot_min_cap = 0,
     .screen_on = NULL,

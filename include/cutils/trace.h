@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (C) 2012 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,13 +65,15 @@ __BEGIN_DECLS
 #define ATRACE_TAG_AUDIO            (1<<8)
 #define ATRACE_TAG_VIDEO            (1<<9)
 #define ATRACE_TAG_CAMERA           (1<<10)
-#define ATRACE_TAG_HAL              (1<<11)
-#define ATRACE_TAG_APP              (1<<12)
-#define ATRACE_TAG_RESOURCES        (1<<13)
-#define ATRACE_TAG_DALVIK           (1<<14)
-#define ATRACE_TAG_RS               (1<<15)
-#define ATRACE_TAG_BIONIC           (1<<16)
-#define ATRACE_TAG_POWER            (1<<17)
+#define ATRACE_TAG_HWUI             (1<<11)
+#define ATRACE_TAG_PERF             (1<<12)
+#define ATRACE_TAG_HAL              (1<<13)
+#define ATRACE_TAG_APP              (1<<14)
+#define ATRACE_TAG_RESOURCES        (1<<15)
+#define ATRACE_TAG_DALVIK           (1<<16)
+#define ATRACE_TAG_RS               (1<<17)
+#define ATRACE_TAG_BIONIC           (1<<18)
+#define ATRACE_TAG_POWER            (1<<19)
 #define ATRACE_TAG_LAST             ATRACE_TAG_POWER
 
 // Reserved for initialization.
@@ -226,6 +233,10 @@ static inline void atrace_async_end(uint64_t tag, const char* name, int32_t cook
  * This can be used to track how a value changes over time.
  */
 #define ATRACE_INT(name, value) atrace_int(ATRACE_TAG, name, value)
+/*
+ * M: Performance tracer to reduce Systrace overhead
+ */
+#define ATRACE_INT_PERF(name, value) atrace_int(ATRACE_TAG|ATRACE_TAG_PERF, name, value)
 static inline void atrace_int(uint64_t tag, const char* name, int32_t value)
 {
     if (CC_UNLIKELY(atrace_is_tag_enabled(tag))) {

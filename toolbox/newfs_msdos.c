@@ -1,4 +1,9 @@
 /*
+* Copyright (C) 2014 MediaTek Inc.
+* Modification based on code covered by the mentioned copyright
+* and/or permission notice(s).
+*/
+/*
  * Copyright (c) 1998 Robert Nordier
  * All rights reserved.
  *
@@ -73,6 +78,25 @@ static const char rcsid[] =
 #define MINCLS12  1         /* minimum FAT12 clusters */
 #define MINCLS16  0x1000    /* minimum FAT16 clusters */
 #define MINCLS32  2         /* minimum FAT32 clusters */
+
+/*
+   http://support.microsoft.com/kb/314463/en-us
+   For MS windows, A FAT32 volume must contain a minimum of 65,527 clusters. 
+   However, the minimum cluster should be 65,537 after the experiment in XP.
+   Thus, we add more budget to make sure workable
+*/
+#define MINCLS32_MS_WINDOWS  (65527+20)		/* minimum FAT32 clusters for MS windows*/
+
+/*
+ * The size of our in-memory I/O buffer.  This is the size of the writes we
+ * do to the device (except perhaps a few odd sectors at the end).
+ *
+ * This must be a multiple of the sector size.  Larger is generally faster,
+ * but some old devices have bugs if you ask them to do more than 128KB
+ * per I/O.
+ */
+#define IO_BUFFER_SIZE	(512*1024)
+
 #define MAXCLS12  0xfed     /* maximum FAT12 clusters */
 #define MAXCLS16  0xfff5    /* maximum FAT16 clusters */
 #define MAXCLS32  0xffffff5 /* maximum FAT32 clusters */
@@ -233,6 +257,22 @@ static void mklabel(u_int8_t *, const char *);
 static void setstr(u_int8_t *, const char *, size_t);
 static void usage(void);
 
+#define WRITE_TRY_NUM 5
+ssize_t  write_try(int fd, const void *buf, size_t count) {
+   int i;
+   ssize_t written = 0;
+   off_t cur = lseek(fd, 0, SEEK_CUR);
+   
+   for (i = 0; i < WRITE_TRY_NUM; i++) {
+       lseek(fd, cur, SEEK_SET);
+       if ((written = write(fd, buf, count)) == (ssize_t)count) {
+            break;          
+       }
+       printf("write failed or not completed, try(%d), count(%d), written(%d) \n", i, (int)count, (int)written);
+   }
+   return written;
+}
+
 /*
  * Construct a FAT12, FAT16, or FAT32 file system.
  */
@@ -256,7 +296,8 @@ int newfs_msdos_main(int argc, char *argv[])
     struct bsxbpb *bsxbpb;
     struct bsx *bsx;
     struct de *de;
-    u_int8_t *img;
+    u_int8_t *io_buffer;    /* The buffer for sectors being constructed/written */
+    u_int8_t *img;	    /* Current sector within io_buffer */
     const char *fname, *dtype, *bname;
     ssize_t n;
     time_t now;
@@ -358,6 +399,9 @@ int newfs_msdos_main(int argc, char *argv[])
     if (argc < 1 || argc > 2)
         usage();
     fname = *argv++;
+
+set_option_again:
+	
     if (!opt_create && !strchr(fname, '/')) {
         snprintf(buf, sizeof(buf), "%s%s", _PATH_DEV, fname);
         if (!(fname = strdup(buf)))
@@ -588,8 +632,13 @@ int newfs_msdos_main(int argc, char *argv[])
         x1 += x * bpb.nft;
         x = (u_int64_t)(bpb.bsec - x1) * bpb.bps * NPB /
                 (bpb.spc * bpb.bps * NPB + fat / BPN * bpb.nft);
+
+        if (((bpb.bsec - x1) * bpb.bps * NPB) % (bpb.spc * bpb.bps * NPB + fat / BPN * bpb.nft) > 0)
+            x += 1;
+
         x2 = howmany((RESFTE + MIN(x, maxcls(fat))) * (fat / BPN), bpb.bps * NPB);
         if (set_spf) {
+            printf("x=%u, x1=%u, bspf=%u\n", x, x1, x2);
             if (!bpb.bspf) {
                 bpb.bspf = x2;
             }
@@ -621,6 +670,16 @@ int newfs_msdos_main(int argc, char *argv[])
     printf("%s: %u sector%s in %u FAT%u cluster%s (%u bytes/cluster)\n",
            fname, cls * bpb.spc, cls * bpb.spc == 1 ? "" : "s", cls, fat,
            cls == 1 ? "" : "s", bpb.bps * bpb.spc);
+
+    if (fat == 32 && cls < MINCLS32_MS_WINDOWS ){
+        if (bpb.spc > 1) {
+            opt_c = bpb.spc/2;
+            printf("For MS windows FAT32 compatibility, need to increase the number of cluster, cls=%u, MINCLS32_MS_WINDOWS=%u, bpb.spc=%u, opt_c=%u \n",
+                   cls, MINCLS32_MS_WINDOWS, bpb.spc, opt_c);       
+            goto set_option_again;
+        }
+    }
+	
     if (!bpb.mid)
         bpb.mid = !bpb.hid ? 0xf0 : 0xf8;
     if (fat == 32)
@@ -638,8 +697,9 @@ int newfs_msdos_main(int argc, char *argv[])
         gettimeofday(&tv, NULL);
         now = tv.tv_sec;
         tm = localtime(&now);
-        if (!(img = malloc(bpb.bps)))
-            err(1, "%u", bpb.bps);
+        if (!(io_buffer = malloc(IO_BUFFER_SIZE)))
+            err(1, "%u", IO_BUFFER_SIZE);
+        img = io_buffer;
         dir = bpb.res + (bpb.spf ? bpb.spf : bpb.bspf) * bpb.nft;
         for (lsn = 0; lsn < dir + (fat == 32 ? bpb.spc : rds); lsn++) {
             x = lsn;
@@ -734,9 +794,25 @@ int newfs_msdos_main(int argc, char *argv[])
                         (u_int)tm->tm_mday;
                 mk2(de->date, x);
             }
-            if ((n = write(fd, img, bpb.bps)) == -1)
+
+            img += bpb.bps;
+            if (img >= (io_buffer + IO_BUFFER_SIZE)) {
+               /* We filled the I/O buffer, so write it out now */
+               if ((n = write_try(fd, io_buffer, IO_BUFFER_SIZE)) == -1)
+                   err(1, "%s", fname);
+               if (n != IO_BUFFER_SIZE){
+                   errx(1, "%s: can't write sector %u", fname, lsn);
+                   exit(1);
+               }
+               img = io_buffer;
+            }
+        }
+
+        if (img != io_buffer) {
+            /* The I/O buffer was partially full; write it out before exit */
+            if ((n = write_try(fd, io_buffer, img-io_buffer)) == -1)
                 err(1, "%s", fname);
-            if ((unsigned)n != bpb.bps) {
+            if (n != (img-io_buffer)){
                 errx(1, "%s: can't write sector %u", fname, lsn);
                 exit(1);
             }

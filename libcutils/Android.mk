@@ -1,4 +1,9 @@
 #
+# Copyright (C) 2014 MediaTek Inc.
+# Modification based on code covered by the mentioned copyright
+# and/or permission notice(s).
+#
+#
 # Copyright (C) 2008 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -129,6 +134,20 @@ ifneq ($(ENABLE_CPUSETS),)
 LOCAL_CFLAGS += -DUSE_CPUSETS
 endif
 LOCAL_CFLAGS += -Werror -std=gnu90
+#M: arm 32bit
+ifeq ($(MTK_USER_SPACE_DEBUG_FW),yes)
+  ifeq ($(TARGET_BUILD_VARIANT),eng)
+    ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
+      ifneq ($(TARGET_IS_64_BIT),true) 
+          LOCAL_ARM_MODE := arm
+          LOCAL_CFLAGS += -fno-omit-frame-pointer -Wno-strict-aliasing
+      else
+          LOCAL_ARM_MODE := arm
+          LOCAL_CFLAGS_arm += -fno-omit-frame-pointer -Wno-strict-aliasing
+      endif
+    endif
+  endif
+endif
 include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
@@ -141,6 +160,20 @@ ifneq ($(ENABLE_CPUSETS),)
 LOCAL_CFLAGS += -DUSE_CPUSETS
 endif
 LOCAL_CFLAGS += -Werror
+#M: arm 32bit
+ifeq ($(MTK_USER_SPACE_DEBUG_FW),yes)
+  ifeq ($(TARGET_BUILD_VARIANT),eng)
+    ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
+      ifneq ($(TARGET_IS_64_BIT),true) 
+          LOCAL_ARM_MODE := arm
+          LOCAL_CFLAGS += -fno-omit-frame-pointer
+      else
+          LOCAL_ARM_MODE := arm
+          LOCAL_CFLAGS_arm += -fno-omit-frame-pointer
+      endif
+    endif
+  endif
+endif
 LOCAL_C_INCLUDES := $(libcutils_c_includes)
 include $(BUILD_SHARED_LIBRARY)
 
